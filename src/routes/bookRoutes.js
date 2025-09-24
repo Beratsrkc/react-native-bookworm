@@ -13,11 +13,11 @@ router.post("/", protectRoute, async (req, res) => {
       return res.status(400).json({ message: "Please provide all fields" });
     }
 
-    //upload the image to cloudinary
+    // upload the image to cloudinary
     const uploadResponse = await cloudinary.uploader.upload(image);
     const imageUrl = uploadResponse.secure_url;
 
-    //sace to the database
+    // save to the database
     const newBook = new Book({
       title,
       caption,
@@ -30,32 +30,33 @@ router.post("/", protectRoute, async (req, res) => {
 
     res.status(201).json(newBook);
   } catch (error) {
-    console.log("Error creating book ", error);
+    console.log("Error creating book", error);
     res.status(500).json({ message: error.message });
   }
 });
 
+// pagination => infinite loading
 router.get("/", protectRoute, async (req, res) => {
   // example call from react native - frontend
   // const response = await fetch("http://localhost:3000/api/books?page=1&limit=5");
   try {
     const page = req.query.page || 1;
-    const limit = req.query.limit || 5;
+    const limit = req.query.limit || 2;
     const skip = (page - 1) * limit;
 
     const books = await Book.find()
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: -1 }) // desc
       .skip(skip)
       .limit(limit)
       .populate("user", "username profileImage");
 
-     const totalBooks = await Book.countDocuments();
+    const totalBooks = await Book.countDocuments();
 
     res.send({
       books,
       currentPage: page,
       totalBooks,
-      totalPage: Math.ceil(totalBooks / limit),
+      totalPages: Math.ceil(totalBooks / limit),
     });
   } catch (error) {
     console.log("Error in get all books route", error);
@@ -79,13 +80,12 @@ router.delete("/:id", protectRoute, async (req, res) => {
     const book = await Book.findById(req.params.id);
     if (!book) return res.status(404).json({ message: "Book not found" });
 
-    //check if user is the creator of the book
+    // check if user is the creator of the book
     if (book.user.toString() !== req.user._id.toString())
       return res.status(401).json({ message: "Unauthorized" });
 
     // https://res.cloudinary.com/de1rm4uto/image/upload/v1741568358/qyup61vejflxxw8igvi0.png
     // delete image from cloduinary as well
-
     if (book.image && book.image.includes("cloudinary")) {
       try {
         const publicId = book.image.split("/").pop().split(".")[0];
@@ -103,4 +103,5 @@ router.delete("/:id", protectRoute, async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
 export default router;
